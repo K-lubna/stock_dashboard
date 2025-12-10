@@ -1,20 +1,5 @@
-// public/js/dashboard.js
-
 document.addEventListener('DOMContentLoaded', () => {
-    
-    // =========================================================================
-    // 🛑 1. CRITICAL FIX: Define the Base URLs for the Deployed Services
-    // 
-    // You MUST replace 'https://YOUR-BACKEND-API-URL.onrender.com'
-    // with the actual public URL of your Render Web Service running the API.
-    // =========================================================================
-    const API_BASE_URL = 'https://stock-dashboard-6d2b.onrender.com';
-    // Use wss:// for WebSocket connections on secured (https) sites
-    const WS_BASE_URL = 'wss://stock-dashboard-6d2b.onrender.com'; 
-    // =========================================================================
-    
-
-    // 2. Setup Variables
+    // 1. Setup Variables
     const userEmail = localStorage.getItem('userEmail');
     const userToken = localStorage.getItem('userToken');
     const emailDisplay = document.getElementById('user-email');
@@ -23,11 +8,11 @@ document.addEventListener('DOMContentLoaded', () => {
     const subscribeForm = document.getElementById('subscribe-form');
     const subscribeStatus = document.getElementById('subscribe-status');
     const noStocksMessage = document.getElementById('no-stocks-message');
-    const recList = document.getElementById('recommendation-list');
+    const recList = document.getElementById('recommendation-list'); // NEW Element for suggestions
     
     const historyData = {}; 
 
-    // 3. Authentication Check & Logout
+    // 1. Authentication Check & Logout
     if (!userToken || !userEmail) {
         window.location.href = '/login.html';
         return;
@@ -40,7 +25,7 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     
     // =========================================================================
-    // 4. Unsubscribe Logic 
+    // 2. NEW: Unsubscribe Logic (Must be global for inline 'onclick')
     // =========================================================================
 
     async function unsubscribeStock(ticker) {
@@ -52,8 +37,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            // FIX: Use API_BASE_URL
-            const response = await fetch(`${https://stock-dashboard-6d2b.onrender.com}/api/unsubscribe`, {
+            const response = await fetch('https://stock-dashboard-6d2b.onrender.com/api/unsubscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: token, ticker: ticker })
@@ -75,6 +59,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     message.style.display = 'block';
                 }
                 
+                // IMPORTANT: Reload recommendations when watchlist changes
                 loadRecommendations(); 
                 
             } else {
@@ -90,13 +75,13 @@ document.addEventListener('DOMContentLoaded', () => {
 
     
     // =========================================================================
-    // 5. Subscription & Data Load Functions
+    // 3. Subscription & Data Load Functions
     // =========================================================================
 
     async function loadSubscriptions() {
         try {
-            // FIX: Use API_BASE_URL
-            const response = await fetch(`${https://stock-dashboard-6d2b.onrender.com}/api/login`, {
+            // Using the /api/login endpoint as per your current code structure
+            const response = await fetch('https://stock-dashboard-6d2b.onrender.com/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: userEmail })
@@ -126,8 +111,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchInitialHistory(ticker) {
         try {
-            // FIX: Use API_BASE_URL
-            const response = await fetch(`${https://stock-dashboard-6d2b.onrender.com}/api/history/${ticker}`);
+            const response = await fetch(`https://stock-dashboard-6d2b.onrender.com/api/history/${ticker}`);
             const data = await response.json();
             if (data.success && data.history.length > 0) {
                 drawMiniChart(ticker, data.history);
@@ -137,7 +121,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 6. Stock Card DOM Manipulation (Unmodified)
+    // 4. Stock Card DOM Manipulation (UNMODIFIED)
     function createStockCard(ticker) {
         if (document.getElementById(`stock-${ticker}`)) return;
 
@@ -165,7 +149,7 @@ document.addEventListener('DOMContentLoaded', () => {
         noStocksMessage.style.display = 'none';
     }
 
-    // 7. Canvas Drawing Function (Unmodified)
+    // 5. Canvas Drawing Function (UNMODIFIED)
     function drawMiniChart(ticker, history) {
         historyData[ticker] = history; 
         
@@ -207,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ctx.stroke();
     }
 
-    // 8. Update Price Logic (Unmodified)
+    // 6. Update Price Logic (UNMODIFIED)
     function updateStockPrice(ticker, newPrice) {
         const priceElement = document.getElementById(`price-${ticker}`);
         const changeElement = document.getElementById(`change-${ticker}`);
@@ -249,10 +233,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
 
-    // 9. WebSocket Connection
+    // 7. WebSocket Connection (UNMODIFIED)
     function connectWebSocket(token) {
-        // FIX: Use WS_BASE_URL (wss://)
-        const ws = new WebSocket(`${WS_BASE_URL}?token=${token}`);
+        const ws = new WebSocket(`ws:stock-dashboard-6d2b.onrender.com?token=${token}`);
 
         ws.onopen = () => console.log('WebSocket connection established.');
         
@@ -273,7 +256,7 @@ document.addEventListener('DOMContentLoaded', () => {
         ws.onerror = (error) => console.error('WebSocket error:', error);
     }
 
-    // 10. Subscription Handler
+    // 8. Subscription Handler (UNMODIFIED)
     subscribeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const ticker = document.getElementById('ticker-select').value;
@@ -281,8 +264,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (!ticker) return;
 
         try {
-            // FIX: Use API_BASE_URL
-            const response = await fetch(`${https://stock-dashboard-6d2b.onrender.com}/api/subscribe`, {
+            const response = await fetch('http://localhost:3000/api/subscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: userToken, ticker })
@@ -309,25 +291,30 @@ document.addEventListener('DOMContentLoaded', () => {
     
     
     // =========================================================================
-    // 11. Stock Recommendation Logic
+    // 9. NEW: Stock Recommendation Logic
     // =========================================================================
 
+    /**
+     * Fetches real-time stock recommendations and updates the suggestions list.
+     */
     async function loadRecommendations() {
         if (!recList) return;
         
+        // Show a loading message while fetching
         recList.innerHTML = '<p id="no-recommendations">Analyzing market movement...</p>';
 
         try {
-            // FIX: Use API_BASE_URL
-            const response = await fetch(`${https://stock-dashboard-6d2b.onrender.com}/api/recommendations?token=${userToken}`); 
+            // NOTE: Fetching from a new endpoint '/api/recommendations'
+            const response = await fetch(`https://stock-dashboard-6d2b.onrender.com/api/recommendations?token=${userToken}`); 
             const data = await response.json();
 
             if (data.success && data.recommendations && data.recommendations.length > 0) {
-                recList.innerHTML = '';
+                recList.innerHTML = ''; // Clear loading message
                 data.recommendations.forEach(rec => {
                     const item = document.createElement('div');
                     item.className = 'recommendation-item';
                     
+                    // Display Ticker, Signal Type, and Rationale (No buttons)
                     item.innerHTML = `
                         <span class="rec-ticker">${rec.ticker}</span>
                         <span class="rec-signal signal-${rec.signalType.toLowerCase()}">${rec.signalType}</span>
@@ -344,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
     
-    // 12. Start the application
+    // 10. Start the application
     loadSubscriptions(); 
     loadRecommendations();
     
