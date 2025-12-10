@@ -248,7 +248,7 @@ setInterval(updateAndBroadcastPrices, 1000);
 
 
 server.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
+    console.log(`Server running at https://stock-dashboard-6d2b.onrender.com`);
     console.log('---');
     console.log('API Endpoints Ready: /api/login, /api/register, /api/subscribe, /api/unsubscribe, /api/history/:ticker, /api/recommendations');
     console.log(`WebSocket Server Ready at ws://localhost:${PORT}`);
