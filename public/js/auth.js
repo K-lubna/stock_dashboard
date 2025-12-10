@@ -1,7 +1,7 @@
 // public/js/auth.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Get references to both possible forms and the error display
+    // 1. Get references to both possible forms and the error displa
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
     const errorMessage = document.getElementById('error-message');
