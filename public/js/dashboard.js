@@ -1,5 +1,4 @@
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Setup Variables
     const userEmail = localStorage.getItem('userEmail');
     const userToken = localStorage.getItem('userToken');
     const emailDisplay = document.getElementById('user-email');
@@ -8,11 +7,10 @@ document.addEventListener('DOMContentLoaded', () => {
     const subscribeForm = document.getElementById('subscribe-form');
     const subscribeStatus = document.getElementById('subscribe-status');
     const noStocksMessage = document.getElementById('no-stocks-message');
-    const recList = document.getElementById('recommendation-list'); // NEW Element for suggestions
+    const recList = document.getElementById('recommendation-list'); 
     
     const historyData = {}; 
 
-    // 1. Authentication Check & Logout
     if (!userToken || !userEmail) {
         window.location.href = '/login.html';
         return;
@@ -23,11 +21,8 @@ document.addEventListener('DOMContentLoaded', () => {
         localStorage.clear();
         window.location.href = '/login.html';
     });
-    
-    // =========================================================================
-    // 2. NEW: Unsubscribe Logic (Must be global for inline 'onclick')
-    // =========================================================================
 
+    // ================= Unsubscribe =================
     async function unsubscribeStock(ticker) {
         const token = localStorage.getItem('userToken');
         if (!token) {
@@ -37,31 +32,24 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         try {
-            const response = await fetch('https://stock-dashboard-6d2b.onrender.com/api/unsubscribe', {
+            const response = await fetch('http://localhost:3000/api/unsubscribe', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ token: token, ticker: ticker })
+                body: JSON.stringify({ token, ticker })
             });
 
             const result = await response.json();
 
             if (result.success) {
                 console.log(`${ticker} successfully removed.`);
-                
                 const stockElement = document.getElementById(`stock-${ticker}`);
-                if (stockElement) {
-                    stockElement.remove();
+                if (stockElement) stockElement.remove();
+
+                if (stockContainer.children.length === 0 && noStocksMessage) {
+                    noStocksMessage.style.display = 'block';
                 }
-                
-                const container = document.getElementById('stock-container');
-                const message = document.getElementById('no-stocks-message');
-                if (container && container.children.length === 0 && message) {
-                    message.style.display = 'block';
-                }
-                
-                // IMPORTANT: Reload recommendations when watchlist changes
+
                 loadRecommendations(); 
-                
             } else {
                 alert(`Failed to remove ${ticker}: ${result.message}`);
             }
@@ -70,18 +58,12 @@ document.addEventListener('DOMContentLoaded', () => {
             alert('A network error occurred while trying to unsubscribe.');
         }
     }
-    
     window.unsubscribeStock = unsubscribeStock;
 
-    
-    // =========================================================================
-    // 3. Subscription & Data Load Functions
-    // =========================================================================
-
+    // ================= Load Subscriptions =================
     async function loadSubscriptions() {
         try {
-            // Using the /api/login endpoint as per your current code structure
-            const response = await fetch('https://stock-dashboard-6d2b.onrender.com/api/login', {
+            const response = await fetch('http://localhost:3000/api/login', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ email: userEmail })
@@ -95,13 +77,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     createStockCard(ticker);
                     fetchInitialHistory(ticker); 
                 });
-                
-                if (data.subscribedStocks.length > 0) {
-                    noStocksMessage.style.display = 'none';
-                } else {
-                    noStocksMessage.style.display = 'block';
-                }
-                
+
+                noStocksMessage.style.display = data.subscribedStocks.length === 0 ? 'block' : 'none';
+
                 connectWebSocket(userToken); 
             }
         } catch (error) {
@@ -111,7 +89,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     async function fetchInitialHistory(ticker) {
         try {
-            const response = await fetch(`https://stock-dashboard-6d2b.onrender.com/api/history/${ticker}`);
+            const response = await fetch(`http://localhost:3000/api/history/${ticker}`);
             const data = await response.json();
             if (data.success && data.history.length > 0) {
                 drawMiniChart(ticker, data.history);
@@ -121,14 +99,13 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // 4. Stock Card DOM Manipulation (UNMODIFIED)
+    // ================= Stock Cards =================
     function createStockCard(ticker) {
         if (document.getElementById(`stock-${ticker}`)) return;
 
         const card = document.createElement('div');
         card.className = 'stock-card';
         card.id = `stock-${ticker}`;
-        
         card.innerHTML = `
             <div class="ticker-info">
                 <div class="ticker">${ticker}</div>
@@ -149,49 +126,37 @@ document.addEventListener('DOMContentLoaded', () => {
         noStocksMessage.style.display = 'none';
     }
 
-    // 5. Canvas Drawing Function (UNMODIFIED)
     function drawMiniChart(ticker, history) {
         historyData[ticker] = history; 
-        
         const canvas = document.getElementById(`chart-${ticker}`);
         if (!canvas) return;
-        
         const ctx = canvas.getContext('2d');
         const width = canvas.width;
         const height = canvas.height;
-        
-        ctx.clearRect(0, 0, width, height);
 
+        ctx.clearRect(0, 0, width, height);
         if (history.length < 2) return;
 
         const max = Math.max(...history);
         const min = Math.min(...history);
         const range = max === min ? 1 : max - min; 
-        
         const color = history[history.length - 1] >= history[0] ? '#28a745' : '#dc3545';
         
         ctx.beginPath();
         ctx.lineWidth = 2;
         ctx.strokeStyle = color;
-        
         const pointWidth = width / (history.length - 1 || 1); 
 
         history.forEach((price, index) => {
             const normalizedY = (price - min) / range;
             const yPos = (height - 5) - (normalizedY * (height - 10)) + 5; 
             const xPos = index * pointWidth;
-
-            if (index === 0) {
-                ctx.moveTo(xPos, yPos);
-            } else {
-                ctx.lineTo(xPos, yPos);
-            }
+            if (index === 0) ctx.moveTo(xPos, yPos);
+            else ctx.lineTo(xPos, yPos);
         });
-
         ctx.stroke();
     }
 
-    // 6. Update Price Logic (UNMODIFIED)
     function updateStockPrice(ticker, newPrice) {
         const priceElement = document.getElementById(`price-${ticker}`);
         const changeElement = document.getElementById(`change-${ticker}`);
@@ -200,8 +165,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const currentPrice = parseFloat(priceElement.textContent || newPrice); 
             const price = parseFloat(newPrice);
             const change = price - currentPrice;
-            
-            // Visual Cues
+
             if (change > 0) {
                 priceElement.className = 'price price-up';
                 changeElement.textContent = `+${change.toFixed(2)}`;
@@ -209,36 +173,30 @@ document.addEventListener('DOMContentLoaded', () => {
                 priceElement.className = 'price price-down';
                 changeElement.textContent = change.toFixed(2);
             } else {
-                 priceElement.className = 'price';
-                 changeElement.textContent = '0.00';
+                priceElement.className = 'price';
+                changeElement.textContent = '0.00';
             }
-            
+
             priceElement.textContent = price.toFixed(2);
 
-            // Flash effect cleanup
             setTimeout(() => {
                 if (priceElement) priceElement.className = 'price';
             }, 500);
 
-            // Chart Update Logic
             if (historyData[ticker]) {
-                if (historyData[ticker].length >= 60) {
-                    historyData[ticker].shift();
-                }
+                if (historyData[ticker].length >= 60) historyData[ticker].shift();
                 historyData[ticker].push(price);
-                
                 drawMiniChart(ticker, historyData[ticker]);
             }
         }
     }
 
-
-    // 7. WebSocket Connection (UNMODIFIED)
+    // ================= WebSocket =================
     function connectWebSocket(token) {
-        const ws = new WebSocket(`ws:stock-dashboard-6d2b.onrender.com?token=${token}`);
+        const ws = new WebSocket(`ws://localhost:3000?token=${token}`);
 
         ws.onopen = () => console.log('WebSocket connection established.');
-        
+
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
@@ -249,18 +207,17 @@ document.addEventListener('DOMContentLoaded', () => {
         };
 
         ws.onclose = () => {
-            console.log('WebSocket connection closed. Attempting to reconnect in 5 seconds...');
+            console.log('WebSocket closed. Reconnecting in 5s...');
             setTimeout(() => connectWebSocket(token), 5000);
         };
 
         ws.onerror = (error) => console.error('WebSocket error:', error);
     }
 
-    // 8. Subscription Handler (UNMODIFIED)
+    // ================= Subscription =================
     subscribeForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         const ticker = document.getElementById('ticker-select').value;
-        
         if (!ticker) return;
 
         try {
@@ -269,9 +226,8 @@ document.addEventListener('DOMContentLoaded', () => {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ token: userToken, ticker })
             });
-            
-            const data = await response.json();
 
+            const data = await response.json();
             if (data.success) {
                 loadSubscriptions(); 
                 subscribeStatus.textContent = `${ticker} subscribed successfully!`;
@@ -285,44 +241,31 @@ document.addEventListener('DOMContentLoaded', () => {
             subscribeStatus.style.color = 'red';
             console.error('Subscription API error:', error);
         }
-        
+
         setTimeout(() => subscribeStatus.textContent = '', 3000);
     });
-    
-    
-    // =========================================================================
-    // 9. NEW: Stock Recommendation Logic
-    // =========================================================================
 
-    /**
-     * Fetches real-time stock recommendations and updates the suggestions list.
-     */
+    // ================= Recommendations =================
     async function loadRecommendations() {
         if (!recList) return;
-        
-        // Show a loading message while fetching
         recList.innerHTML = '<p id="no-recommendations">Analyzing market movement...</p>';
 
         try {
-            // NOTE: Fetching from a new endpoint '/api/recommendations'
-            const response = await fetch(`https://stock-dashboard-6d2b.onrender.com/api/recommendations?token=${userToken}`); 
+            const response = await fetch(`http://localhost:3000/api/recommendations?token=${userToken}`); 
             const data = await response.json();
 
             if (data.success && data.recommendations && data.recommendations.length > 0) {
-                recList.innerHTML = ''; // Clear loading message
+                recList.innerHTML = '';
                 data.recommendations.forEach(rec => {
                     const item = document.createElement('div');
                     item.className = 'recommendation-item';
-                    
-                    // Display Ticker, Signal Type, and Rationale (No buttons)
                     item.innerHTML = `
                         <span class="rec-ticker">${rec.ticker}</span>
                         <span class="rec-signal signal-${rec.signalType.toLowerCase()}">${rec.signalType}</span>
                         <p class="rec-reason">${rec.reason}</p>
-                    `; 
+                    `;
                     recList.appendChild(item);
                 });
-                
             } else {
                 recList.innerHTML = `<p id="no-recommendations">No strong signals detected this moment.</p>`;
             }
@@ -330,11 +273,9 @@ document.addEventListener('DOMContentLoaded', () => {
             recList.innerHTML = `<p class="error-text">Failed to load suggestions.</p>`;
         }
     }
-    
-    // 10. Start the application
+
+    // ================= Init =================
     loadSubscriptions(); 
     loadRecommendations();
-    
-    // Refresh recommendations every 5 seconds for real-time signaling
     setInterval(loadRecommendations, 5000); 
 });
