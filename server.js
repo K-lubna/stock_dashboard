@@ -8,7 +8,7 @@ const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
-const PORT = 3000;
+const PORT = 3000; // Localhost port
 const SUPPORTED_STOCKS = ['GOOG', 'TSLA', 'AMZN', 'META', 'NVDA'];
 const HISTORY_LENGTH = 60; // Store 60 seconds of history for the graph
 
@@ -20,22 +20,18 @@ let currentPrices = SUPPORTED_STOCKS.reduce((acc, ticker) => {
     return acc;
 }, {});
 
-// In-memory price history (NEW)
+// In-memory price history
 let priceHistory = SUPPORTED_STOCKS.reduce((acc, ticker) => {
-    // Populate history with initial prices for drawing
     acc[ticker] = new Array(HISTORY_LENGTH).fill(currentPrices[ticker]); 
     return acc;
 }, {});
 
 function loadUsers() {
     try {
-        // Ensure the directory exists
         const dataDir = path.join(__dirname, 'data');
-        if (!fs.existsSync(dataDir)) {
-            fs.mkdirSync(dataDir);
-        }
+        if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir);
+
         const filePath = path.join(dataDir, 'users.json');
-        
         if (!fs.existsSync(filePath)) {
             fs.writeFileSync(filePath, '[]', 'utf8');
             return [];
@@ -62,12 +58,9 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// NEW: API Endpoint for Registration
+// --- Registration ---
 app.post('/api/register', (req, res) => {
     const { email } = req.body;
-    // NOTE: In a real app, you would handle the password here. 
-    // Since the client doesn't send a password, we only check the email for uniqueness.
-    
     const users = loadUsers();
     
     if (users.find(u => u.email === email)) {
@@ -79,43 +72,30 @@ app.post('/api/register', (req, res) => {
     users.push(newUser);
     saveUsers(users);
 
-    // After successful registration, log them in immediately and return token
-    res.json({ success: true, token, email, subscribedStocks: newUser.subscribedStocks, message: "Registration successful. Logging you in..." });
+    res.json({ success: true, token, email, subscribedStocks: newUser.subscribedStocks, message: "Registration successful." });
 });
 
-
-// 1. API Endpoint for Login
+// --- Login ---
 app.post('/api/login', (req, res) => {
     const { email } = req.body;
     const users = loadUsers();
-    
     let user = users.find(u => u.email === email);
-    let token;
 
-    if (user) {
-        token = user.token;
-    } else {
-        // If the user doesn't exist, we send an error and ask them to register
-        // NOTE: This logic changed slightly from the original to encourage registration
+    if (!user) {
         return res.status(404).json({ success: false, message: 'User not found. Please register.' });
     }
 
-    res.json({ success: true, token, email, subscribedStocks: user.subscribedStocks });
+    res.json({ success: true, token: user.token, email, subscribedStocks: user.subscribedStocks });
 });
 
-// 2. API Endpoint for Subscription
+// --- Subscribe ---
 app.post('/api/subscribe', (req, res) => {
     const { token, ticker } = req.body;
     const users = loadUsers();
     let user = users.find(u => u.token === token);
 
-    if (!user) {
-        return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-    
-    if (!SUPPORTED_STOCKS.includes(ticker)) {
-        return res.status(400).json({ success: false, message: 'Unsupported stock ticker.' });
-    }
+    if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+    if (!SUPPORTED_STOCKS.includes(ticker)) return res.status(400).json({ success: false, message: 'Unsupported stock ticker.' });
 
     if (!user.subscribedStocks.includes(ticker)) {
         user.subscribedStocks.push(ticker);
@@ -125,16 +105,14 @@ app.post('/api/subscribe', (req, res) => {
     res.json({ success: true, message: `${ticker} subscribed.`, currentPrice: currentPrices[ticker] });
 });
 
-// NEW: API Endpoint for Unsubscribe (client requested this)
+// --- Unsubscribe ---
 app.post('/api/unsubscribe', (req, res) => {
     const { token, ticker } = req.body;
     const users = loadUsers();
     let user = users.find(u => u.token === token);
 
-    if (!user) {
-        return res.status(401).json({ success: false, message: 'Unauthorized' });
-    }
-    
+    if (!user) return res.status(401).json({ success: false, message: 'Unauthorized' });
+
     const initialLength = user.subscribedStocks.length;
     user.subscribedStocks = user.subscribedStocks.filter(t => t !== ticker);
 
@@ -146,8 +124,7 @@ app.post('/api/unsubscribe', (req, res) => {
     }
 });
 
-
-// 3. API Endpoint for Initial History Fetch (NEW for Graphs)
+// --- Price History ---
 app.get('/api/history/:ticker', (req, res) => {
     const ticker = req.params.ticker.toUpperCase();
     if (priceHistory[ticker]) {
@@ -157,10 +134,8 @@ app.get('/api/history/:ticker', (req, res) => {
     }
 });
 
-// NEW: Minimal Recommendation Logic (For Client Code)
+// --- Recommendations ---
 app.get('/api/recommendations', (req, res) => {
-    // In a real app, this would be based on real-time analysis.
-    // Here, we provide a simple mock logic.
     const recs = [];
     const subscribed = loadUsers().find(u => u.token === req.query.token)?.subscribedStocks || [];
     const available = SUPPORTED_STOCKS.filter(t => !subscribed.includes(t));
@@ -177,9 +152,7 @@ app.get('/api/recommendations', (req, res) => {
     res.json({ success: true, recommendations: recs });
 });
 
-
-// --- WebSocket (Real-time Engine) ---
-
+// --- WebSocket ---
 const clientSubscriptions = new Map(); 
 
 wss.on('connection', (ws, req) => {
@@ -200,17 +173,12 @@ wss.on('connection', (ws, req) => {
     }
 
     clientSubscriptions.set(ws, user.subscribedStocks);
-    // console.log(`Client connected: ${user.email}. Subscribed to: ${user.subscribedStocks.join(', ')}`);
 
-    ws.on('close', () => {
-        clientSubscriptions.delete(ws);
-        // console.log(`Client disconnected.`);
-    });
+    ws.on('close', () => clientSubscriptions.delete(ws));
 });
 
-// Price Update and Broadcast Function
+// --- Price Update and Broadcast ---
 function updateAndBroadcastPrices() {
-    // 1. Update prices for all supported stocks
     for (const ticker of SUPPORTED_STOCKS) {
         let current = currentPrices[ticker];
         const changeFactor = (Math.random() - 0.5) * 0.03; 
@@ -219,22 +187,14 @@ function updateAndBroadcastPrices() {
         
         currentPrices[ticker] = newPrice;
         
-        // Update price history (NEW)
-        if (priceHistory[ticker].length >= HISTORY_LENGTH) {
-            priceHistory[ticker].shift(); // Remove oldest
-        }
-        priceHistory[ticker].push(newPrice); // Add newest
+        if (priceHistory[ticker].length >= HISTORY_LENGTH) priceHistory[ticker].shift();
+        priceHistory[ticker].push(newPrice);
 
-        const priceUpdateMessage = JSON.stringify({
-            ticker: ticker,
-            price: newPrice.toFixed(2)
-        });
+        const priceUpdateMessage = JSON.stringify({ ticker, price: newPrice.toFixed(2) });
 
-        // 2. Broadcast updated price only to clients who are subscribed
         wss.clients.forEach(client => {
             if (client.readyState === WebSocket.OPEN) {
                 const subscribedTickers = clientSubscriptions.get(client);
-                
                 if (subscribedTickers && subscribedTickers.includes(ticker)) {
                     client.send(priceUpdateMessage);
                 }
@@ -243,14 +203,11 @@ function updateAndBroadcastPrices() {
     }
 }
 
-// Start the real-time engine
 setInterval(updateAndBroadcastPrices, 1000); 
 
-
+// --- Start Server ---
 server.listen(PORT, () => {
-    console.log(`Server running at https://stock-dashboard-6d2b.onrender.com`);
-    console.log('---');
-    console.log('API Endpoints Ready: /api/login, /api/register, /api/subscribe, /api/unsubscribe, /api/history/:ticker, /api/recommendations');
-    console.log(`WebSocket Server Ready at ws:https://stock-dashboard-6d2b.onrender.com`);
-    console.log('---');
+    console.log(`Server running at http://localhost:${PORT}`);
+    console.log('API Endpoints: /api/login, /api/register, /api/subscribe, /api/unsubscribe, /api/history/:ticker, /api/recommendations');
+    console.log(`WebSocket Server: ws://localhost:${PORT}`);
 });
