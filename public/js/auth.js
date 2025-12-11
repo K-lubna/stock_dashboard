@@ -1,12 +1,10 @@
 // public/js/auth.js
 
 document.addEventListener('DOMContentLoaded', () => {
-    // 1. Get references to both possible forms and the error displa
     const loginForm = document.getElementById('login-form');
     const registerForm = document.getElementById('register-form');
     const errorMessage = document.getElementById('error-message');
 
-    // Generic handler function for API response
     function handleAuthResponse(data, response) {
         if (data.success) {
             localStorage.setItem('userEmail', data.email);
@@ -17,11 +15,11 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // --- Login Handler (If on login.html) ---
+    // --- Login Handler ---
     if (loginForm) {
         loginForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            errorMessage.textContent = ''; // Clear previous errors
+            errorMessage.textContent = '';
             const email = document.getElementById('email').value.trim();
 
             if (!email) {
@@ -30,7 +28,7 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             try {
-                const response = await fetch('https://stock-dashboard-6d2b.onrender.com/api/login', {
+                const response = await fetch('http://localhost:3000/api/login', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
@@ -38,8 +36,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
                 const data = await response.json();
                 handleAuthResponse(data, response);
-                
-                // Special check to suggest registration if user is not found (Status 404)
+
                 if (!data.success && response.status === 404) {
                     errorMessage.innerHTML = `User not found. Please <a href="/register.html">register here</a>.`;
                 }
@@ -51,28 +48,26 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     }
 
-    // --- Registration Handler (If on register.html) ---
+    // --- Registration Handler ---
     if (registerForm) {
         registerForm.addEventListener('submit', async (e) => {
             e.preventDefault();
-            errorMessage.textContent = ''; // Clear previous errors
+            errorMessage.textContent = '';
             const email = document.getElementById('reg-email').value.trim();
 
             if (!email) {
                 errorMessage.textContent = 'Email cannot be empty.';
                 return;
             }
-            
+
             try {
-                // This hits the new registration endpoint
-                const response = await fetch('https://stock-dashboard-6d2b.onrender.com/api/register', {
+                const response = await fetch('http://localhost:3000/api/register', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ email })
                 });
 
                 const data = await response.json();
-                // handleAuthResponse logs the user in and redirects on success
                 handleAuthResponse(data, response);
 
             } catch (error) {
